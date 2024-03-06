@@ -11,7 +11,7 @@ const short display_size = 64*32;
  
 #define debug_print(fmt, ...)                        \
     do {                                             \
-        if (DEBUG) fprint(stderr, fmt, __VA_ARGS__); \
+        if (DEBUG) fprintf(stderr, fmt, __VA_ARGS__); \
     }while (0);
 
 int DEBUG = 1;
@@ -220,19 +220,59 @@ void ciclo_emulacion(void){
         case 0x8000:
             switch (op_code & 0x000F){
                 case 0x0000:
-
+                    debug_print("[OK] 0x%X: 8XY0\n", op_code);
+                    V[x] = V[y];
+                    pc += 2;
                     break;
                 case 0x0001:
-
+                    debug_print("[OK] 0x%X: 8XY1\n", op_code);
+                    V[x] = (V[x] | V[y]);
+                    pc += 2;
                     break;
                 case 0x0002:
-
+                    debug_print("[OK] 0x%X: 0x8XY2\n", op_code);
+                    V[x] = (V[x] & V[y]);
+                    pc += 2;
                     break;
                 case 0x0003:
-
+                    debug_print("[OK] 0x%X: 0x8XY3\n", op_code);
+                    V[x] = (V[x] ^ V[y]);
+                    pc += 2;
                     break;
-                
+                case 0x0004:
+                    debug_print("[OK] 0x%X: 0x8XY4\n", op_code);
+                    V[x] = V[x] + V[y];
+                    pc += 2;
+                    break;
+                case 0x0005:
+                    debug_print("[OK] 0x%X: 0x8XY5\n", op_code);
+                    V[0xF] = (V[x] > V[y]) ? 1 : 0;
+                    V[x] -= V[y];
+                    pc += 2;
+                    break;
+                case 0x0006:
+                    debug_print("[OK] 0x%X: 0x8XY6\n", op_code);
+                    V[0xF] = V[x] & 0x1;
+                    V[x] = (V[x] >> 1);
+                    pc += 2;
+                    break;
+                case 0x0007:
+                    debug_print("[OK] x%X: 0x8XY7\n", op_code);
+                    V[0xF] = (V[x] < V[y]) ? 1 : 0;
+                    V[x] = V[y] - V[x];
+                    pc += 2;
+                    break;
+                case 0x000E:
+                    debug_print("[OK] 0x%X: 0x8XYE\n", op_code);
+                    V[0xF] = (V[x] >> 7) & 0x1;
+                    V[x] = (V[x] << 1);
+                    pc += 2;
+                    break;
+                default:
+                    debug_print("[FAILED] Unknown op_code: 0x%X\n", op_code);
+                    break;
             }
+            break;
         case 0x9000:
             debug_print("[OK] 0x0%X: 9XY0\n", op_code);
             if(V[x] != V[y]){
@@ -240,6 +280,137 @@ void ciclo_emulacion(void){
             }
             pc += 2;
             break;
-        
+        case 0xA000:
+            debug_print("[OK] 0x%X: 0xANNN\n", op_code);
+            I = op_code & 0x0FFF;
+            pc += 2;
+            break;
+        case 0xB000:
+            debug_print("[OK] 0x%X: 0xBNNN", op_code);
+            pc = (op_code & 0x0FFF) + V[0];
+            break;
+        case 0xC000:
+            debug_print("[OK] 0x%X: 0xCXNN\n", op_code);
+            V[x] = (rand() % 256) & (op_code & 0x00FF);
+            pc += 2;
+            break;
+        //La siguiente instrucción es el Display, se viene tocho papus
+        case 0xD000:
+            debug_print("[OK] 0x%X: 0xDXYN\n", op_code);
+            unsigned short height = op_code & 0x000F;
+            unsigned short px;
+
+            //Ajustar flag de colisión a 0
+            V[0xF] = 0;
+
+            //Para cada fila
+            for(int yline = 0; yline < height; yline++){
+                px = memory[I + yline];
+                //Para cada pixel de una fila
+                for(int xline = 0; xline < 8; xline++){
+                    if((px & (0x80 >> xline)) != 0){
+                        if(display[(V[x] + xline + ((V[y] + yline)*64)) == 1]){
+                            V[0xF] = 1;
+                        }
+                        display[V[x] + xline + ((V[y] + yline) * 64)] ^= 1;
+                    }
+                }
+            }
+            pc += 2;
+            break;
+        case 0xE000:
+            switch(op_code & 0x00FF){
+                case 0x009E:
+                    debug_print("[OK] 0x%X: 0xEX9E\n", op_code);
+                    if(keypad[V[x]]){
+                        pc += 2;
+                    }
+                    pc += 2;
+                    break;
+                case 0x00A1:
+                    debug_print("[OK] 0x%X: 0xEXA1\n", op_code);
+                    if(!keypad[V[x]]){
+                        pc += 2;
+                    }
+                    pc += 2;
+                    break;
+                default:
+                    debug_print("[FAILED] Unknown op_code: 0x%X\n", op_code);
+            }
+            break;
+        case 0xF000:
+            switch(op_code & 0x00FF){
+                case 0x0007:
+                    debug_print("[OK] 0x%X: 0xFX07\n", op_code);
+                    V[x] = dt;
+                    pc += 2;
+                    break;
+                case 0x0015:
+                    debug_print("[OK] 0x%X: 0xFX15\n", op_code);
+                    dt = V[x];
+                    pc += 2;
+                    break;
+                case 0x0018:
+                    debug_print("[OK] 0x0%X: 0xF18\n", op_code);
+                    st = V[x];
+                    pc += 2;
+                    break;
+                case 0x001E:
+                    debug_print("[OK] 0x%X: 0xFX1E\n", op_code);
+                    I += V[x];
+                    pc += 2;
+                    break;
+                case 0x000A:
+                    debug_print("[OK] 0x%X: 0xFX0A\n", op_code);
+                    for(int i = 0; i < 16; i++){
+                        if(keypad[i]){
+                            V[x] = i;
+                            pc += 2;
+                            break;
+                        }
+                    }
+                    break;
+                case 0x0029:
+                    debug_print("[OK] 0x%X: 0xFX29\n", op_code);
+                    I = V[x] * 5;
+                    pc += 2;
+                    break;
+                case 0x0033:
+                    debug_print("[OK] 0x%X: 0xFX33\n", op_code);
+                    memory[I] = (V[x] % 1000) / 100;
+                    memory[I+1] = (V[x] % 100) / 10;
+                    memory[I+2] = (V[x] % 10);
+                    pc += 2;
+                    break;
+                case 0x0055:
+                    debug_print("[OK] 0x%X: 0xFX55\n", op_code);
+                    for(int i = 0; i <= x; i++){
+                        memory[I + i] = V[i];
+                    }
+                    pc += 2;
+                    break;
+                case 0x0065:
+                    debug_print("[OK] 0x%X: 0xFX65\n", op_code);
+                    for(int i = 0; i <= x; i++){
+                        V[i] = memory[I +i];
+                    }
+                    pc += 2;
+                    break;
+                default:
+                    debug_print("[FAILED] Unknown op_code: 0x%X\n", op_code);
+                    break;
+            }
+            break;
+        default:
+            debug_print("[FAILED] Unknown op_code: 0x%X", op_code);
+            break;
+    }
+
+    //Timers
+    if(dt > 0) dt -= 1;
+    if(st > 0){
+        sound_flag = 1;
+        puts("BEEP");
+        st -= 1;
     }
 }

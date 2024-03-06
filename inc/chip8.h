@@ -12,12 +12,12 @@ extern unsigned char keypad[16];
 extern unsigned char display[64 * 32];
 extern unsigned char dt;
 extern unsigned char st;
-extern unsigned char draw_flags;
+extern unsigned char draw_flag;
 extern unsigned char sound_flag;
 
 void init_cpu(void);
 int load_rom(char*filename);
-void emulate_cycle(void);
+void ciclo_emulacion(void);
 
 #define error(...) fprintf(stderr, __VA_ARGS__)
 
